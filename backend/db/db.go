@@ -35,7 +35,7 @@ func (db *Database) MigrateUp() error {
 
 	m, err := migrate.New(filePath, connStr)
 	if err != nil {
-		return fmt.Errorf("creating migration err: %w", err)
+		return fmt.Errorf("create migration err: %w", err)
 	}
 
 	err = m.Up()
