@@ -24,11 +24,11 @@ type authResponse struct {
 
 // RegisterAuthRoutes підключає маршрути /auth
 func RegisterAuthRoutes(r chi.Router) {
-	r.Post("/login", loginHandler)
+	r.Post("/login", LoginHandler)
 }
 
 // loginHandler – створює користувача (якщо нового) і повертає JWT
-func loginHandler(w http.ResponseWriter, r *http.Request) {
+func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var req authRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

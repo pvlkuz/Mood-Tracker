@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	"github.com/joho/godotenv"
 
 	"moodtracker/db"
@@ -31,11 +32,24 @@ func main() {
 	}
 
 	r := chi.NewRouter()
+
+	r.Use(cors.Handler(cors.Options{
+		// Дозволяємо доступ тільки з фронтенд-адреси (якщо потрібно, можна замінити на * для всіх)
+		AllowedOrigins:   []string{"http://localhost:5173"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: true,
+		MaxAge:           300, // 5 хв
+	}))
+
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	r.Route("/auth", handlers.RegisterAuthRoutes)
-	r.Route("/mood", handlers.RegisterMoodRoutes)
-	r.Route("/user/telegram", handlers.RegisterTelegramRoutes)
+	r.Route("/api", func(r chi.Router) {
+		r.Route("/auth", handlers.RegisterAuthRoutes)
+		r.Route("/mood", handlers.RegisterMoodRoutes)
+		r.Route("/user/telegram", handlers.RegisterTelegramRoutes)
+	})
 
 	telegram.Start(db.DB.DB)
 

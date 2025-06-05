@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"net/http"
 	"time"
 
@@ -18,29 +19,53 @@ import (
 func RegisterMoodRoutes(r chi.Router) {
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.JWTAuth)
-		r.Post("/", createMood)
-		r.Get("/", listMood)
-		r.Put("/{id}", updateMood)
-		r.Delete("/{id}", deleteMood)
+		r.Post("/", CreateMood)
+		r.Get("/", ListMood)
+		r.Get("/{id}", getMoodByID)
+		r.Put("/{id}", UpdateMood)
+		r.Delete("/{id}", DeleteMood)
 	})
 }
 
-func createMood(w http.ResponseWriter, r *http.Request) {
+func CreateMood(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Icon    string `json:"icon"`
 		Comment string `json:"comment"`
+		Date    string `json:"date"` // формат "YYYY-MM-DD"
 	}
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	if in.Icon == "" {
+		http.Error(w, "icon is required", http.StatusBadRequest)
+		return
+	}
+	if in.Comment == "" {
+		http.Error(w, "comment is required", http.StatusBadRequest)
+		return
+	}
+
+	// Розбір дати
+	var dt time.Time
+	if in.Date != "" {
+		var err error
+		dt, err = time.Parse("2006-01-02", in.Date)
+		if err != nil {
+			http.Error(w, "invalid date format, expected YYYY-MM-DD", http.StatusBadRequest)
+			return
+		}
+	} else {
+		dt = time.Now()
+	}
 
 	userID := r.Context().Value(middleware.UserIDKey).(string)
 	now := time.Now()
+
 	m := models.Mood{
 		ID:        uuid.NewString(),
 		UserID:    userID,
-		Date:      now,
+		Date:      dt,
 		Icon:      in.Icon,
 		Comment:   in.Comment,
 		CreatedAt: now,
@@ -54,12 +79,13 @@ func createMood(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(m)
 }
 
-func listMood(w http.ResponseWriter, r *http.Request) {
+func ListMood(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(middleware.UserIDKey).(string)
 	from := r.URL.Query().Get("from")
 	to := r.URL.Query().Get("to")
@@ -81,7 +107,27 @@ func listMood(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(moods)
 }
 
-func updateMood(w http.ResponseWriter, r *http.Request) {
+func getMoodByID(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(string)
+	id := chi.URLParam(r, "id")
+
+	var m models.Mood
+	err := db.DB.Get(&m,
+		`SELECT * FROM mood WHERE id=$1 AND user_id=$2`, id, userID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(m)
+}
+
+func UpdateMood(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	var in struct {
 		Icon    string `json:"icon"`
@@ -107,7 +153,7 @@ func updateMood(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func deleteMood(w http.ResponseWriter, r *http.Request) {
+func DeleteMood(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	userID := r.Context().Value(middleware.UserIDKey).(string)
 	res, err := db.DB.Exec(
