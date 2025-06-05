@@ -18,11 +18,11 @@ type chatReq struct {
 func RegisterTelegramRoutes(r chi.Router) {
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.JWTAuth)
-		r.Post("/register", registerTelegram)
+		r.Post("/register", RegisterTelegram)
 	})
 }
 
-func registerTelegram(w http.ResponseWriter, r *http.Request) {
+func RegisterTelegram(w http.ResponseWriter, r *http.Request) {
 	var req chatReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
